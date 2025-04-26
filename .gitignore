@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv
+venv/
+
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Redis
+dump.rdb
