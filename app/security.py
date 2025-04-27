@@ -1,24 +1,35 @@
 import hmac
 import hashlib
+import json
+
+def generate_direct_signature(payload: dict, secret_key: str) -> str:
+    """
+    Generate a signature exactly matching the frontend implementation
+    with no string manipulation
+    """
+    # Convert payload to a JSON string with no extra formatting
+    payload_str = json.dumps(payload, separators=(',', ':'))
+    
+    # Calculate HMAC
+    signature = hmac.new(
+        secret_key.encode('utf-8'),
+        payload_str.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+    
+    return signature
 
 def verify_signature(payload: dict, secret_key: str, signature: str) -> bool:
     """
     Verify webhook signature using HMAC-SHA256
     """
-    if not signature.startswith("sha256="):
-        return False
+    if signature.startswith("sha256="):
+        expected_signature = signature.split("=")[1]
+    else:
+        expected_signature = signature
     
-    expected_signature = signature.split("=")[1]
+    # Calculate signature using our direct method
+    calculated_signature = generate_direct_signature(payload, secret_key)
     
-    # Convert payload to bytes
-    payload_bytes = str(payload).encode('utf-8')
-    
-    # Calculate HMAC
-    hmac_obj = hmac.new(
-        secret_key.encode('utf-8'),
-        payload_bytes,
-        hashlib.sha256
-    )
-    calculated_signature = hmac_obj.hexdigest()
-    
+    # Compare signatures
     return hmac.compare_digest(calculated_signature, expected_signature)

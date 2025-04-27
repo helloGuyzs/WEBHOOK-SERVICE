@@ -5,6 +5,15 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "types": [
+      "@types/babel__core",
+      "@types/babel__generator", 
+      "@types/babel__template",
+      "@types/babel__traverse",
+      "@types/crypto-js",
+      "@types/estree",
+      "@types/parse-json"
+    ],
 
     /* Bundler mode */
     "moduleResolution": "bundler",

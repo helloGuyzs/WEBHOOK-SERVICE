@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     
     # Webhook settings
-    MAX_RETRY_ATTEMPTS: int = 5
-    RETRY_INTERVALS: list[int] = [10, 30, 60, 300, 900]  # in seconds
+    MAX_RETRY_ATTEMPTS: int = 3
+    RETRY_INTERVALS: list[int] = [10, 30, 60]  # in seconds
     WEBHOOK_TIMEOUT: int = 10  # seconds
     LOG_RETENTION_HOURS: int = 72
 

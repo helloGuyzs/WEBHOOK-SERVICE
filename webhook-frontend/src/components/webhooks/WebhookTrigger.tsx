@@ -12,12 +12,11 @@ import {
   Textarea,
   Title,
   Code,
-  Paper,
-  GroupProps,
-  StackProps
+  Paper
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import CryptoJS from 'crypto-js';
+import { HmacSHA256 } from 'crypto-js';
+import { enc } from 'crypto-js';
 import { Subscription } from '../../types/subscription';
 import { subscriptionService } from '../../services/subscriptionService';
 
@@ -28,17 +27,17 @@ interface ISubscription extends Subscription {
 // The simplest and most reliable signature function
 const generateDirectSignature = (payload: any, secretKey: string): string => {
   try {
-    // Use exact same format as backend with no room for differences
+    // Use exact same format as backend
     const simplePayloadStr = JSON.stringify(
       typeof payload === 'string' ? JSON.parse(payload) : payload, 
-      null, 0  // no formatting, most basic stringification
+      null, 0  // no formatting, basic stringification
     );
     
     console.log('Raw payload as JSON:', simplePayloadStr);
     
-    // Generate HMAC with SHA256 (exact same as backend)
-    const hmac = CryptoJS.HmacSHA256(simplePayloadStr, secretKey);
-    const signature = hmac.toString(CryptoJS.enc.Hex);
+    // Generate HMAC with SHA256 (matching backend)
+    const hmac = HmacSHA256(simplePayloadStr, secretKey);
+    const signature = hmac.toString(enc.Hex);
     
     console.log('Generated signature:', signature);
     return signature;
@@ -111,7 +110,7 @@ export function WebhookTrigger() {
       const payloadObj = JSON.parse(form.payload);
       const signature = generateDirectSignature(payloadObj, secretKey);
 
-      const response = await fetch(`http://localhost:8000/webhooks/ingest/${id}`, {
+      const response = await fetch(`http://3.108.68.73:8000/webhooks/ingest/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,8 +145,8 @@ export function WebhookTrigger() {
   };
 
   return (
-    <Stack<StackProps>
-      spacing="lg"
+    <Stack
+      gap="lg"
       style={{ width: '100%' }}
     >
       <Title order={2}>Trigger Webhook</Title>
@@ -158,8 +157,8 @@ export function WebhookTrigger() {
       </Text>
 
       <Card withBorder>
-        <Stack<StackProps>
-          spacing="md"
+        <Stack
+          gap="md"
           style={{ width: '100%' }}
         >
           <TextInput
@@ -206,12 +205,12 @@ export function WebhookTrigger() {
 
           {signature && (
             <Paper withBorder p="md">
-              <Stack<StackProps>
-                spacing="xs"
+              <Stack
+                gap="xs"
                 style={{ width: '100%' }}
               >
-                <Group<GroupProps>
-                  position="apart"
+                <Group
+                  justify="space-between"
                   style={{ width: '100%' }}
                 >
                   <Text fw={500}>Signature</Text>
@@ -235,12 +234,12 @@ export function WebhookTrigger() {
 
           {curlCommand && (
             <Paper withBorder p="md">
-              <Stack<StackProps>
-                spacing="xs"
+              <Stack
+                gap="xs"
                 style={{ width: '100%' }}
               >
-                <Group<GroupProps>
-                  position="apart"
+                <Group
+                  justify="space-between"
                   style={{ width: '100%' }}
                 >
                   <Text fw={500}>cURL Command</Text>

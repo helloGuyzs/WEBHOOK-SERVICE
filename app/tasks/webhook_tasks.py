@@ -9,6 +9,7 @@ from app.models.subscription import Subscription
 from app.core.db_init import init_db
 from celery.schedules import crontab
 import time
+import requests
 
 logger = get_task_logger(__name__)
 
@@ -40,80 +41,92 @@ def process_webhook(self, delivery_id: int):
         delivery = db.query(WebhookDelivery).get(delivery_id)
         if not delivery:
             logger.error(f"Delivery {delivery_id} not found")
-            db.close()
             return
         
         # Get subscription details
         subscription = db.query(Subscription).get(delivery.subscription_id)
         if not subscription:
             logger.error(f"Subscription {delivery.subscription_id} not found")
-            db.close()
             return
         
-        # Store subscription URL before closing session
         target_url = subscription.target_url
-        payload = delivery.payload
         
-        # Update delivery status
+        # Check if max retries reached
+        if delivery.attempt_count >= settings.MAX_RETRY_ATTEMPTS:
+            delivery.status = "FAILED"
+            delivery.next_retry = None
+            db.commit()
+            logger.error(f"Webhook {delivery_id} failed permanently after {settings.MAX_RETRY_ATTEMPTS} attempts")
+            return
+        
+        # Update delivery status and attempt count
         delivery.status = "IN_PROGRESS"
         delivery.attempt_count += 1
         delivery.last_attempt = datetime.utcnow()
-        db.commit()
-        db.close()
         
-        # Make HTTP request without active session
         try:
-            with httpx.Client(timeout=settings.WEBHOOK_TIMEOUT) as client:
-                logger.info(f"Sending webhook to {target_url}")
-                response = client.post(
-                    target_url,
-                    json=payload,
-                    headers={"Content-Type": "application/json"}
-                )
+            logger.info(f"Sending webhook to {target_url}")
+            response = requests.post(
+                target_url,
+                json=delivery.payload,
+                timeout=settings.WEBHOOK_TIMEOUT
+            )
             
-            # Create new session for recording attempt
-            db = SessionLocal()
-            delivery = db.query(WebhookDelivery).get(delivery_id)
-            
+            # Record attempt
             attempt = DeliveryAttempt(
                 delivery_id=delivery_id,
                 attempt_number=delivery.attempt_count,
                 status_code=response.status_code,
-                outcome="SUCCESS" if response.status_code == 200 else "FAILED_ATTEMPT"
+                error_details=response.text if response.status_code >= 400 else None,
+                outcome="SUCCESS" if response.status_code < 400 else "FAILED_ATTEMPT"
             )
             db.add(attempt)
-            db.commit()
             
-            if response.status_code == 200:
+            if response.status_code >= 400:
+                if delivery.attempt_count >= settings.MAX_RETRY_ATTEMPTS:
+                    delivery.status = "FAILED"
+                    delivery.next_retry = None
+                    logger.error(f"Webhook {delivery_id} failed permanently after {settings.MAX_RETRY_ATTEMPTS} attempts")
+                else:
+                    retry_delay = settings.RETRY_INTERVALS[delivery.attempt_count - 1]
+                    delivery.status = "PENDING_RETRY"
+                    delivery.next_retry = datetime.utcnow() + timedelta(seconds=retry_delay)
+                    process_webhook.apply_async(args=[delivery_id], countdown=retry_delay)
+            else:
                 delivery.status = "COMPLETED"
-                db.commit()
-                db.close()
-                logger.info(f"Webhook {delivery_id} delivered successfully")
-                return
+                delivery.next_retry = None
             
-            # Handle non-success response
-            delivery.status = "PENDING_RETRY"
-            retry_delay = settings.RETRY_INTERVALS[min(self.request.retries, len(settings.RETRY_INTERVALS)-1)]
-            delivery.next_retry = datetime.utcnow() + timedelta(seconds=retry_delay)
             db.commit()
-            db.close()
-            logger.warning(f"Webhook {delivery_id} failed with status {response.status_code}")
-            raise self.retry(countdown=retry_delay)
             
-        except httpx.RequestError as exc:
-            logger.error(f"HTTP request error for webhook {delivery_id}: {str(exc)}")
-            db.rollback()
-            db.close()
-            raise self.retry(exc=exc)
+        except requests.RequestException as e:
+            attempt = DeliveryAttempt(
+                delivery_id=delivery_id,
+                attempt_number=delivery.attempt_count,
+                error_details=str(e),
+                outcome="FAILED_ATTEMPT"
+            )
+            db.add(attempt)
+            
+            if delivery.attempt_count >= settings.MAX_RETRY_ATTEMPTS:
+                delivery.status = "FAILED"
+                delivery.next_retry = None
+                logger.error(f"Webhook {delivery_id} failed permanently after max retries")
+            else:
+                retry_delay = settings.RETRY_INTERVALS[delivery.attempt_count - 1]
+                delivery.status = "PENDING_RETRY"
+                delivery.next_retry = datetime.utcnow() + timedelta(seconds=retry_delay)
+                process_webhook.apply_async(args=[delivery_id], countdown=retry_delay)
+            
+            db.commit()
             
     except Exception as exc:
         logger.error(f"Unhandled error in process_webhook {delivery_id}: {str(exc)}")
-        try:
-            db.rollback()
-            db.close()
-        except:
-            pass
-        raise self.retry(exc=exc)
+        if 'delivery' in locals():
+            delivery.status = "FAILED"
+            delivery.next_retry = None
+            db.commit()
+    finally:
+        db.close()
 
 @celery_app.task
 def cleanup_old_logs():
