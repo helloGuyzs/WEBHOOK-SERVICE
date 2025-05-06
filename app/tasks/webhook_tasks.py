@@ -22,15 +22,20 @@ for i in range(retries):
 
 celery_app = Celery(
     'webhook_tasks',
-    broker=f'redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/0',
-    backend=f'redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/0'
+    broker=settings.BROKER_URL,
+    backend=settings.CELERY_RESULT_BACKEND
 )
 
 # Add these configurations
 celery_app.conf.update(
+    broker_connection_retry=True,
     broker_connection_retry_on_startup=True,
+    broker_connection_max_retries=5,
+    broker_pool_limit=None,
     worker_prefetch_multiplier=1,
-    task_track_started=True
+    task_track_started=True,
+    redis_max_connections=None,
+    redis_socket_timeout=30
 )
 
 @celery_app.task(bind=True, max_retries=settings.MAX_RETRY_ATTEMPTS)

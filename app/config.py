@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     # Redis
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
+    BROKER_URL: str = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+    CELERY_RESULT_BACKEND: str = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+    BROKER_CONNECTION_RETRY: bool = True
+    BROKER_CONNECTION_MAX_RETRIES: int = 5
     
     # Webhook settings
     MAX_RETRY_ATTEMPTS: int = 3

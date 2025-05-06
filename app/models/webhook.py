@@ -9,10 +9,11 @@ class DeliveryAttempt(Base):
     id = Column(Integer, primary_key=True, index=True)
     delivery_id = Column(Integer, ForeignKey("webhook_deliveries.id"))
     attempt_number = Column(Integer)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
     status_code = Column(Integer, nullable=True)
     error_details = Column(Text, nullable=True)
-    outcome = Column(String, nullable=False)
+    outcome = Column(String)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class WebhookDelivery(Base):
     __tablename__ = "webhook_deliveries"
