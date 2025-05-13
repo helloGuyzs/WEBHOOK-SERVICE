@@ -2,9 +2,11 @@ from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.models.subscription import Subscription
 
 class DeliveryAttempt(Base):
     __tablename__ = "delivery_attempts"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     delivery_id = Column(Integer, ForeignKey("webhook_deliveries.id"))
@@ -17,6 +19,7 @@ class DeliveryAttempt(Base):
 
 class WebhookDelivery(Base):
     __tablename__ = "webhook_deliveries"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     subscription_id = Column(Integer, ForeignKey("subscriptions.id"), nullable=False)

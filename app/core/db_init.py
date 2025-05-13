@@ -39,13 +39,19 @@ def init_db():
         return False
         
     try:
-        # Create tables in correct order
-        Base.metadata.create_all(bind=engine, tables=[
-            Subscription.__table__,
-            WebhookDelivery.__table__,
-            DeliveryAttempt.__table__
-        ])
-        logger.info("Successfully created database tables")
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        
+        tables_to_create = []
+        for table in [Subscription.__table__, WebhookDelivery.__table__, DeliveryAttempt.__table__]:
+            if table.name not in existing_tables:
+                tables_to_create.append(table)
+        
+        if tables_to_create:
+            Base.metadata.create_all(bind=engine, tables=tables_to_create)
+            logger.info("Successfully created missing database tables")
+        else:
+            logger.info("All tables already exist")
         return True
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")

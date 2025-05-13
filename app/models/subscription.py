@@ -4,6 +4,7 @@ from app.database import Base
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True)
     target_url = Column(String, nullable=False)
